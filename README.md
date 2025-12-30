@@ -1,38 +1,203 @@
-# OCR Table Extractor
+# Baseball Stats OCR Extractor
 
-A powerful web-based OCR tool that extracts tables from screenshots and builds an editable database from the results. Built with FastAPI, PostgreSQL, and Tesseract OCR.
+A powerful multi-user web application for extracting baseball statistics from screenshots using OCR technology. Features role-based access control, collection management, and cloud deployment support.
+
+Perfect for teams that need to digitize baseball statistics from images, PDFs, or screenshots with controlled access to different datasets.
 
 ## Features
 
-- **Upload Screenshots**: Drag & drop or click to upload image files (PNG, JPG, JPEG, BMP, TIFF)
-- **Automatic Table Detection**: Intelligent detection and extraction of tables from images
-- **OCR Processing**: Extract text from tables using Tesseract OCR with img2table
-- **Editable Database**: Store extracted data in PostgreSQL with full CRUD capabilities
-- **Web-based Editor**: Edit extracted table data directly in your browser
-- **Real-time Updates**: Monitor processing status with auto-refresh
-- **Confidence Scores**: See OCR confidence levels for quality assessment
+### Core Functionality
+- **Intelligent OCR Processing**: Automatically extract tables from screenshots using Tesseract OCR + img2table
+- **Table Structure Recognition**: Detect and preserve table structure (rows, columns, cells)
+- **Editable Database**: Store and edit extracted data in PostgreSQL
+- **Confidence Scores**: View OCR accuracy metrics for quality assessment
+- **Background Processing**: Asynchronous OCR processing with status tracking
+
+### Multi-User & Security
+- **JWT Authentication**: Secure token-based authentication
+- **Role-Based Access Control**: Superuser (admin) and regular user roles
+- **Collection Management**: Organize documents into collections (e.g., "2024 Season", "Player Stats")
+- **Granular Permissions**: Admin controls which users can access which collections
+- **Secure Passwords**: Bcrypt password hashing
+
+### Cloud-Ready
+- **Supabase Integration**: Hosted PostgreSQL database
+- **Render Deployment**: One-click deploy to Render.com
+- **Environment Configuration**: Easy setup with environment variables
+- **Production-Ready**: CORS, security headers, and best practices built-in
+
+## Quick Start
+
+### Option 1: Cloud Deployment (Recommended)
+
+Deploy to the cloud in minutes:
+
+1. **Set up Supabase** (free PostgreSQL database)
+2. **Deploy to Render** (free hosting)
+3. **Create admin account**
+4. **Start uploading!**
+
+👉 **[Follow the Deployment Guide](DEPLOYMENT.md)**
+
+### Option 2: Local Development
+
+```bash
+# 1. Clone and setup
+git clone <your-repo-url>
+cd mess_around
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Set up local PostgreSQL
+# (See detailed instructions below)
+
+# 4. Configure environment
+cp .env.example .env
+# Edit .env with your database credentials
+
+# 5. Run the application
+python main.py
+
+# 6. Visit http://localhost:8000/docs for API documentation
+```
 
 ## Tech Stack
 
-- **Backend**: FastAPI (Python 3.8+)
-- **Database**: PostgreSQL
-- **OCR Engine**: Tesseract + img2table
-- **Frontend**: HTML5, CSS3, Vanilla JavaScript
+- **Backend**: FastAPI (Python 3.11+)
+- **Database**: PostgreSQL (Supabase or self-hosted)
+- **Authentication**: JWT with python-jose
+- **OCR Engine**: Tesseract OCR + img2table
 - **ORM**: SQLAlchemy
+- **Deployment**: Render.com (or any Python hosting)
 
-## Prerequisites
+## Architecture
 
-1. **Python 3.8+**
-2. **PostgreSQL** (version 12 or higher)
-3. **Tesseract OCR** installed on your system
+```
+├── backend/
+│   ├── __init__.py
+│   ├── auth.py           # JWT authentication & authorization
+│   ├── crud.py           # Database operations
+│   ├── database.py       # Database configuration
+│   ├── models.py         # SQLAlchemy models
+│   ├── ocr_processor.py  # OCR and table extraction
+│   └── schemas.py        # Pydantic schemas
+├── static/               # Frontend assets (CSS, JS)
+├── templates/            # HTML templates
+├── main.py              # FastAPI application
+├── requirements.txt     # Python dependencies
+├── render.yaml          # Render deployment config
+├── render-build.sh      # Build script for Render
+└── DEPLOYMENT.md        # Cloud deployment guide
+```
 
-### Installing Tesseract
+## Database Schema
+
+### Core Tables
+
+**users** - User accounts and authentication
+- Stores email, username, hashed password
+- `is_superuser` flag for admin privileges
+- Tracks last login and account status
+
+**collections** - Groupings of related documents
+- Organize by season, team, player, etc.
+- Admin-created and managed
+- Example: "2024 Season Stats", "Historical Data"
+
+**documents** - Uploaded screenshot files
+- Links to uploader and collection
+- Processing status tracking
+- File path and metadata
+
+**extracted_tables** - Metadata about detected tables
+- Rows, columns, confidence score
+- Links to source document
+
+**table_cells** - Individual cell data
+- Row/column position
+- Extracted text content
+- Per-cell confidence score
+
+**user_collection_permissions** - Access control
+- Many-to-many relationship
+- Admin grants users access to specific collections
+
+## User Roles & Permissions
+
+### Superuser (Admin)
+- Create/manage collections
+- Grant/revoke user access to collections
+- View all documents and data
+- Manage user accounts
+- Upload to any collection
+
+### Regular User
+- Register own account
+- Access only assigned collections
+- Upload documents to authorized collections
+- Edit data in authorized collections
+- Cannot see other collections
+
+## API Overview
+
+### Authentication
+```bash
+POST /api/auth/register          # Register new user
+POST /api/auth/login             # Login (get JWT token)
+GET  /api/auth/me                # Get current user info
+```
+
+### Collections (User: view assigned, Admin: full CRUD)
+```bash
+GET    /api/collections          # List accessible collections
+POST   /api/collections          # Create collection (admin)
+GET    /api/collections/{id}     # View collection details
+PUT    /api/collections/{id}     # Update collection (admin)
+DELETE /api/collections/{id}     # Delete collection (admin)
+```
+
+### Documents
+```bash
+POST   /api/upload               # Upload screenshot for OCR
+GET    /api/documents            # List accessible documents
+GET    /api/documents/{id}       # Get document with tables
+DELETE /api/documents/{id}       # Delete document (owner/admin)
+```
+
+### Tables & Cells
+```bash
+GET    /api/tables/{id}          # Get table details
+PUT    /api/cells/{id}           # Update cell content
+DELETE /api/tables/{id}          # Delete table
+```
+
+### Admin
+```bash
+GET    /api/admin/users          # List all users
+PUT    /api/admin/users/{id}     # Update user
+DELETE /api/admin/users/{id}     # Delete user
+POST   /api/admin/permissions/grant   # Grant collection access
+POST   /api/admin/permissions/revoke  # Revoke collection access
+```
+
+👉 **[View Full API Documentation](API_GUIDE.md)**
+
+## Local Development Setup
+
+### Prerequisites
+
+1. **Python 3.11+**
+2. **PostgreSQL 12+**
+3. **Tesseract OCR**
+
+### Install Tesseract
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get update
-sudo apt-get install tesseract-ocr
-sudo apt-get install libtesseract-dev
+sudo apt-get update && sudo apt-get install -y tesseract-ocr libtesseract-dev
 ```
 
 **macOS:**
@@ -41,233 +206,257 @@ brew install tesseract
 ```
 
 **Windows:**
-Download the installer from [GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
+Download from [Tesseract GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
 
-### Installing PostgreSQL
+### Install PostgreSQL
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get update
 sudo apt-get install postgresql postgresql-contrib
+sudo systemctl start postgresql
 ```
 
 **macOS:**
 ```bash
-brew install postgresql
-brew services start postgresql
+brew install postgresql@14
+brew services start postgresql@14
 ```
 
 **Windows:**
-Download the installer from [PostgreSQL.org](https://www.postgresql.org/download/windows/)
+Download from [PostgreSQL.org](https://www.postgresql.org/download/)
 
-## Installation
+### Set Up Local Database
 
-1. **Clone the repository:**
 ```bash
-cd /path/to/mess_around
-```
-
-2. **Create a virtual environment:**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Set up PostgreSQL database:**
-```bash
-# Login to PostgreSQL
+# Access PostgreSQL
 sudo -u postgres psql
 
 # Create database and user
-CREATE DATABASE ocr_database;
-CREATE USER your_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE ocr_database TO your_user;
+CREATE DATABASE baseball_ocr;
+CREATE USER ocr_user WITH PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE baseball_ocr TO ocr_user;
 \q
 ```
 
-5. **Configure environment variables:**
+### Configure Application
+
 ```bash
+# Copy environment template
 cp .env.example .env
+
+# Edit .env file
+nano .env
 ```
 
-Edit `.env` and update the database connection string:
-```
-DATABASE_URL=postgresql://your_user:your_password@localhost:5432/ocr_database
+Update `.env`:
+```env
+DATABASE_URL=postgresql://ocr_user:secure_password@localhost:5432/baseball_ocr
+SECRET_KEY=<generate with: openssl rand -hex 32>
+INIT_SECRET=<choose a secret for first-time setup>
 UPLOAD_DIR=./uploads
 ```
 
-6. **Create necessary directories:**
-```bash
-mkdir -p uploads
-```
+### Run the Application
 
-## Usage
-
-1. **Start the application:**
 ```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Run server
 python main.py
-```
 
-Or using uvicorn directly:
-```bash
+# Or with auto-reload
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-2. **Access the web interface:**
-Open your browser and navigate to:
-```
-http://localhost:8000
-```
+Visit:
+- **API Docs**: http://localhost:8000/docs
+- **App**: http://localhost:8000
 
-3. **Upload and process images:**
-   - Click the upload box or drag & drop an image containing tables
-   - Click "Upload & Process" to start OCR extraction
-   - Wait for processing to complete (status will update automatically)
-   - Click "View Tables" to see extracted tables
-   - Click on a table to edit its contents
+### Create First Admin User
 
-## API Documentation
-
-Once the server is running, access the interactive API documentation:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-### Main Endpoints
-
-#### Upload Document
-```http
-POST /api/upload
-Content-Type: multipart/form-data
-
-file: <image file>
+```bash
+curl -X POST "http://localhost:8000/api/init/create-superuser?secret=YOUR_INIT_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "username": "admin",
+    "password": "SecurePassword123!",
+    "full_name": "Admin User"
+  }'
 ```
 
-#### List Documents
-```http
-GET /api/documents?skip=0&limit=100
+## Usage Example
+
+### 1. Admin Creates Collection
+
+```python
+import requests
+
+# Login as admin
+resp = requests.post("http://localhost:8000/api/auth/login",
+    data={"username": "admin", "password": "SecurePassword123!"})
+admin_token = resp.json()["access_token"]
+
+headers = {"Authorization": f"Bearer {admin_token}"}
+
+# Create collection
+resp = requests.post("http://localhost:8000/api/collections",
+    headers=headers,
+    json={"name": "2024 Season Stats", "description": "Current season"})
+collection = resp.json()
 ```
 
-#### Get Document with Tables
-```http
-GET /api/documents/{document_id}
+### 2. User Registers
+
+```python
+# User registers
+requests.post("http://localhost:8000/api/auth/register",
+    json={
+        "email": "coach@example.com",
+        "username": "coach1",
+        "password": "Password123!",
+        "full_name": "Coach Smith"
+    })
 ```
 
-#### Update Cell Content
-```http
-PUT /api/cells/{cell_id}
-Content-Type: application/json
+### 3. Admin Grants Access
 
-{
-  "content": "Updated text"
-}
+```python
+# Admin grants user access to collection
+requests.post("http://localhost:8000/api/admin/permissions/grant",
+    headers=headers,
+    json={"user_id": 2, "collection_id": 1})
 ```
 
-#### Delete Document
-```http
-DELETE /api/documents/{document_id}
+### 4. User Uploads & Extracts Stats
+
+```python
+# User logs in
+resp = requests.post("http://localhost:8000/api/auth/login",
+    data={"username": "coach1", "password": "Password123!"})
+user_token = resp.json()["access_token"]
+
+user_headers = {"Authorization": f"Bearer {user_token}"}
+
+# Upload screenshot
+with open("batting_stats.png", "rb") as f:
+    resp = requests.post("http://localhost:8000/api/upload",
+        headers=user_headers,
+        params={"collection_id": 1},
+        files={"file": f})
+
+doc_id = resp.json()["id"]
+
+# Wait for processing, then get results
+resp = requests.get(f"http://localhost:8000/api/documents/{doc_id}",
+    headers=user_headers)
+
+document = resp.json()
+for table in document["tables"]:
+    print(f"Table {table['table_number']}: {table['rows']}x{table['columns']}")
+    for cell in table["cells"][:5]:  # First 5 cells
+        print(f"  [{cell['row_index']}, {cell['column_index']}]: {cell['content']}")
 ```
 
-## Project Structure
+## Deployment
 
-```
-mess_around/
-├── backend/
-│   ├── __init__.py
-│   ├── database.py          # Database configuration
-│   ├── models.py            # SQLAlchemy models
-│   ├── schemas.py           # Pydantic schemas
-│   ├── crud.py              # CRUD operations
-│   └── ocr_processor.py     # OCR and table extraction
-├── static/
-│   ├── styles.css           # CSS styles
-│   └── app.js               # Frontend JavaScript
-├── templates/
-│   └── index.html           # Main HTML page
-├── uploads/                 # Uploaded files directory
-├── main.py                  # FastAPI application
-├── requirements.txt         # Python dependencies
-├── .env                     # Environment variables
-└── README.md               # This file
-```
+### Cloud Deployment (Supabase + Render)
 
-## Database Schema
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for complete step-by-step instructions.
 
-### Tables
+**Quick Summary:**
+1. Create Supabase project → Get DATABASE_URL
+2. Push code to GitHub
+3. Connect Render to GitHub repo
+4. Set environment variables in Render
+5. Deploy!
 
-**documents**
-- `id`: Primary key
-- `filename`: Original filename
-- `file_path`: Path to uploaded file
-- `upload_date`: Upload timestamp
-- `processed`: Status (0=pending, 1=processing, 2=completed, 3=failed)
+Free tier includes:
+- Supabase: 500MB database, 1GB files
+- Render: 750 hours/month
 
-**extracted_tables**
-- `id`: Primary key
-- `document_id`: Foreign key to documents
-- `table_number`: Table index in document
-- `rows`: Number of rows
-- `columns`: Number of columns
-- `extraction_date`: Extraction timestamp
-- `confidence`: OCR confidence score
+### Other Deployment Options
 
-**table_cells**
-- `id`: Primary key
-- `table_id`: Foreign key to extracted_tables
-- `row_index`: Row position
-- `column_index`: Column position
-- `content`: Cell text content
-- `confidence`: Cell-level confidence
+- **AWS**: EC2 + RDS PostgreSQL
+- **Google Cloud**: Cloud Run + Cloud SQL
+- **DigitalOcean**: App Platform + Managed PostgreSQL
+- **Heroku**: Heroku + Heroku Postgres
+- **Self-hosted**: Any VPS with Docker
 
 ## Troubleshooting
 
 ### Tesseract Not Found
-If you get an error about Tesseract not being found:
-```python
-# Add to your environment or code
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'/usr/bin/tesseract'  # Linux/Mac
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Windows
+```bash
+# Linux: Install with apt
+sudo apt-get install tesseract-ocr
+
+# Verify installation
+tesseract --version
 ```
 
-### Database Connection Issues
-- Ensure PostgreSQL is running: `sudo service postgresql status`
-- Check your DATABASE_URL in `.env`
-- Verify user permissions in PostgreSQL
+### Database Connection Error
+```bash
+# Check PostgreSQL is running
+sudo systemctl status postgresql
+
+# Test connection
+psql -h localhost -U ocr_user -d baseball_ocr
+```
 
 ### Poor OCR Results
-- Use high-resolution images (300 DPI or higher)
-- Ensure good contrast between text and background
-- Avoid skewed or rotated images
-- Use clear, sans-serif fonts when possible
+- Use high-resolution images (300 DPI minimum)
+- Ensure good contrast
+- Avoid blurry or skewed images
+- Use clear fonts (sans-serif works best)
 
-## Future Enhancements
+### Token Expired
+- Tokens last 7 days by default
+- Login again to get a new token
+- Adjust `ACCESS_TOKEN_EXPIRE_MINUTES` in `backend/auth.py`
 
-- [ ] Support for multiple languages
-- [ ] Batch processing of multiple images
+## Roadmap
+
+- [ ] Web-based admin dashboard UI
 - [ ] Export tables to CSV/Excel
-- [ ] Image preprocessing options (rotate, crop, enhance)
-- [ ] Table merge and split functionality
-- [ ] OCR model selection (Tesseract vs. EasyOCR vs. PaddleOCR)
-- [ ] User authentication and multi-user support
-- [ ] Cloud storage integration
+- [ ] Batch upload multiple images
+- [ ] Image preprocessing (rotate, crop, enhance)
+- [ ] Support for additional languages
+- [ ] Data visualization charts
+- [ ] Audit logging
+- [ ] Email notifications
+- [ ] Mobile app
+- [ ] Cloud storage integration (S3, R2)
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License - See LICENSE file
+
+## Support
+
+- **Documentation**: Check `/docs` endpoint for API reference
+- **Deployment**: See [DEPLOYMENT.md](DEPLOYMENT.md)
+- **API Guide**: See [API_GUIDE.md](API_GUIDE.md)
+- **Issues**: Open an issue on GitHub
 
 ## Acknowledgments
 
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - OCR engine
-- [img2table](https://github.com/xavctn/img2table) - Table detection
-- [SQLAlchemy](https://www.sqlalchemy.org/) - SQL toolkit and ORM
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) - Open source OCR engine
+- [img2table](https://github.com/xavctn/img2table) - Table detection library
+- [Supabase](https://supabase.com/) - Open source Firebase alternative
+- [Render](https://render.com/) - Cloud application platform
+
+---
+
+Made with ❤️ for baseball fans and data enthusiasts

@@ -1,6 +1,69 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import List, Optional
+
+# User schemas
+class UserBase(BaseModel):
+    email: EmailStr
+    username: str
+    full_name: Optional[str] = None
+
+class UserCreate(UserBase):
+    password: str
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class UserResponse(UserBase):
+    id: int
+    is_active: bool
+    is_superuser: bool
+    created_date: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    user_id: Optional[int] = None
+
+# Collection schemas
+class CollectionBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class CollectionCreate(CollectionBase):
+    pass
+
+class CollectionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class CollectionResponse(CollectionBase):
+    id: int
+    created_by_id: Optional[int]
+    created_date: datetime
+
+    class Config:
+        from_attributes = True
+
+class CollectionWithUsersResponse(CollectionResponse):
+    authorized_users: List[UserResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class UserPermission(BaseModel):
+    user_id: int
+    collection_id: int
 
 # Document schemas
 class DocumentBase(BaseModel):
@@ -8,11 +71,20 @@ class DocumentBase(BaseModel):
 
 class DocumentCreate(DocumentBase):
     file_path: str
+    collection_id: int
 
 class DocumentResponse(DocumentBase):
     id: int
     upload_date: datetime
     processed: int
+    uploaded_by_id: int
+    collection_id: int
+
+    class Config:
+        from_attributes = True
+
+class DocumentDetailResponse(DocumentResponse):
+    collection: Optional[CollectionResponse] = None
 
     class Config:
         from_attributes = True
@@ -56,7 +128,7 @@ class ExtractedTableResponse(ExtractedTableBase):
     class Config:
         from_attributes = True
 
-class DocumentWithTablesResponse(DocumentResponse):
+class DocumentWithTablesResponse(DocumentDetailResponse):
     tables: List[ExtractedTableResponse] = []
 
     class Config:

@@ -1,0 +1,22 @@
+services:
+  # Web Service
+  - type: web
+    name: baseball-stats-ocr
+    env: python
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: bash render-build.sh
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: INIT_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true
