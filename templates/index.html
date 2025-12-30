@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Table Extractor</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 OCR Table Extractor</h1>
+            <p>Upload screenshots and extract editable tables</p>
+        </header>
+
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <input type="file" id="fileInput" accept="image/*" hidden>
+                <div class="upload-content">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p>Click to upload or drag and drop</p>
+                    <span>PNG, JPG, JPEG, BMP, TIFF</span>
+                </div>
+            </div>
+            <button id="uploadBtn" class="btn btn-primary" disabled>Upload & Process</button>
+        </div>
+
+        <div class="documents-section">
+            <h2>Documents</h2>
+            <div id="documentsList" class="documents-list">
+                <p class="empty-state">No documents uploaded yet</p>
+            </div>
+        </div>
+
+        <div class="tables-section" id="tablesSection" style="display: none;">
+            <div class="section-header">
+                <h2>Extracted Tables</h2>
+                <button id="backToDocuments" class="btn btn-secondary">← Back to Documents</button>
+            </div>
+            <div id="tablesList" class="tables-list"></div>
+        </div>
+
+        <div class="table-editor" id="tableEditor" style="display: none;">
+            <div class="section-header">
+                <h2>Edit Table</h2>
+                <button id="backToTables" class="btn btn-secondary">← Back to Tables</button>
+            </div>
+            <div id="tableContent"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
