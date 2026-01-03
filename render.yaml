@@ -1,12 +1,12 @@
 services:
-  # Web Service
   - type: web
     name: baseball-stats-ocr
     env: python
+    runtime: python-3.11.0
     region: oregon
     plan: free
-    branch: main
-    buildCommand: bash render-build.sh
+    branch: claude/start-coding-session-011CUa6oAJHqW6rTpQZJ2AxV
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
@@ -17,6 +17,3 @@ services:
         generateValue: true
       - key: UPLOAD_DIR
         value: ./uploads
-      - key: PYTHON_VERSION
-        value: 3.11.0
-    autoDeploy: true
