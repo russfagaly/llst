@@ -137,6 +137,28 @@ const API = {
             method: 'POST',
             body: JSON.stringify({ user_id: userId, collection_id: collectionId })
         });
+    },
+
+    // Review endpoints
+    async getReviewQueue() {
+        return this.request('/api/admin/review');
+    },
+
+    async getReviewDocument(docId) {
+        return this.request(`/api/admin/review/${docId}`);
+    },
+
+    async approveDocument(docId) {
+        return this.request(`/api/admin/review/${docId}/approve`, { method: 'POST' });
+    },
+
+    // Backup endpoints
+    async getBackups() {
+        return this.request('/api/admin/backups');
+    },
+
+    async triggerBackup() {
+        return this.request('/api/admin/backup', { method: 'POST' });
     }
 };
 
@@ -186,13 +208,20 @@ const UI = {
     },
 
     getStatusText(status) {
-        const statuses = ['Pending', 'Processing', 'Completed', 'Failed'];
+        const statuses = ['Pending', 'Processing', 'Completed', 'Failed', 'Pending Review'];
         return statuses[status] || 'Unknown';
     },
 
     getStatusClass(status) {
-        const classes = ['pending', 'processing', 'completed', 'failed'];
+        const classes = ['pending', 'processing', 'completed', 'failed', 'pending_review'];
         return classes[status] || 'pending';
+    },
+
+    formatBytes(bytes) {
+        if (!bytes) return '—';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
     }
 };
 
@@ -387,9 +416,19 @@ function renderDocuments() {
         const statusText = UI.getStatusText(doc.processed);
         const statusClass = UI.getStatusClass(doc.processed);
 
+        let metaLine = '';
+        if (doc.filename_parsed) {
+            const parts = [];
+            if (doc.data_type) parts.push(`<strong>${doc.data_type}</strong>`);
+            if (doc.team_name) parts.push(doc.team_name);
+            if (doc.game_date) parts.push(doc.game_date);
+            metaLine = `<p class="document-meta">${parts.join(' · ')}</p>`;
+        }
+
         return `
             <div class="document-card" onclick="viewDocument(${doc.id})">
                 <h3>${doc.filename}</h3>
+                ${metaLine}
                 <p class="document-meta">Uploaded ${UI.formatDate(doc.upload_date)}</p>
                 <span class="status status-${statusClass}">${statusText}</span>
             </div>
@@ -649,6 +688,181 @@ async function handleRevokeAccess() {
 }
 
 
+// ========== Review Queue ==========
+
+async function loadReviewQueue() {
+    try {
+        const docs = await API.getReviewQueue();
+        const container = document.getElementById('reviewQueueList');
+
+        if (!docs || docs.length === 0) {
+            container.innerHTML = '<p class="empty-state">No documents pending review.</p>';
+            return;
+        }
+
+        container.innerHTML = docs.map(doc => {
+            const metaParts = [];
+            if (doc.data_type) metaParts.push(`<span class="meta-badge">${doc.data_type}</span>`);
+            if (doc.team_name) metaParts.push(`<span class="meta-badge">${doc.team_name}</span>`);
+            if (doc.game_date) metaParts.push(`<span class="meta-badge">${doc.game_date}</span>`);
+            const tableCount = doc.tables ? doc.tables.length : 0;
+            metaParts.push(`<span>${tableCount} table${tableCount !== 1 ? 's' : ''}</span>`);
+            metaParts.push(`<span>Uploaded ${UI.formatDate(doc.upload_date)}</span>`);
+
+            return `
+                <div class="review-queue-card">
+                    <div>
+                        <div style="font-weight:600;">${doc.filename}</div>
+                        <div class="review-queue-meta">${metaParts.join('')}</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openReviewDocument(${doc.id})">Review</button>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        UI.showToast('Failed to load review queue', 'error');
+    }
+}
+
+async function openReviewDocument(docId) {
+    try {
+        UI.showLoading();
+        const doc = await API.getReviewDocument(docId);
+        UI.hideLoading();
+
+        document.getElementById('reviewDocTitle').textContent = doc.filename;
+
+        // Metadata
+        const metaLines = [];
+        if (doc.data_type) metaLines.push(`<p><strong>Type:</strong> ${doc.data_type}</p>`);
+        if (doc.team_name) metaLines.push(`<p><strong>Team:</strong> ${doc.team_name}</p>`);
+        if (doc.game_date) metaLines.push(`<p><strong>Game Date:</strong> ${doc.game_date}</p>`);
+        if (doc.file_number != null) metaLines.push(`<p><strong>File #:</strong> ${doc.file_number}</p>`);
+        document.getElementById('reviewDocMeta').innerHTML = metaLines.join('') || '<p>No parsed metadata</p>';
+
+        // Image — served from /uploads/<filename>
+        document.getElementById('reviewDocImage').src = `/uploads/${doc.filename}`;
+
+        // Tables (reuse existing renderTable)
+        const tablesContainer = document.getElementById('reviewTablesContainer');
+        if (!doc.tables || doc.tables.length === 0) {
+            tablesContainer.innerHTML = '<p class="empty-state">No tables extracted.</p>';
+        } else {
+            tablesContainer.innerHTML = doc.tables.map(table => `
+                <div class="table-card" style="margin-bottom:1rem;">
+                    <h5>Table ${table.table_number + 1} — ${table.rows}×${table.columns}</h5>
+                    ${renderTable(table)}
+                </div>
+            `).join('');
+        }
+
+        // Wire up approve/delete buttons
+        document.getElementById('approveDocBtn').onclick = () => handleApproveDocument(docId);
+        document.getElementById('deleteReviewDocBtn').onclick = () => handleDeleteReviewDocument(docId);
+
+        document.getElementById('reviewDetailPanel').style.display = '';
+
+        // Scroll into view
+        document.getElementById('reviewDetailPanel').scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        UI.hideLoading();
+        UI.showToast('Failed to load document for review', 'error');
+    }
+}
+
+function closeReviewPanel() {
+    document.getElementById('reviewDetailPanel').style.display = 'none';
+}
+
+async function handleApproveDocument(docId) {
+    if (!confirm('Approve this document? It will become visible to all authorized users.')) return;
+    try {
+        UI.showLoading();
+        await API.approveDocument(docId);
+        UI.hideLoading();
+        UI.showToast('Document approved and committed', 'success');
+        closeReviewPanel();
+        await loadReviewQueue();
+    } catch (error) {
+        UI.hideLoading();
+        UI.showToast('Failed to approve document', 'error');
+    }
+}
+
+async function handleDeleteReviewDocument(docId) {
+    if (!confirm('Delete this document? This cannot be undone.')) return;
+    try {
+        UI.showLoading();
+        await API.deleteDocument(docId);
+        UI.hideLoading();
+        UI.showToast('Document deleted', 'success');
+        closeReviewPanel();
+        await loadReviewQueue();
+    } catch (error) {
+        UI.hideLoading();
+        UI.showToast('Failed to delete document', 'error');
+    }
+}
+
+// ========== Backups ==========
+
+async function loadBackups() {
+    try {
+        const backups = await API.getBackups();
+        const container = document.getElementById('backupsTable');
+
+        if (!backups || backups.length === 0) {
+            container.innerHTML = '<p class="empty-state">No backups recorded yet.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Filename</th>
+                        <th>Date</th>
+                        <th>Size</th>
+                        <th>S3 Key</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${backups.map(b => `
+                        <tr>
+                            <td>${b.id}</td>
+                            <td style="font-family:monospace;font-size:0.85em;">${b.filename}</td>
+                            <td>${UI.formatDate(b.created_at)}</td>
+                            <td>${UI.formatBytes(b.size_bytes)}</td>
+                            <td style="font-family:monospace;font-size:0.8em;">${b.s3_key || '—'}</td>
+                            <td><span class="status status-${b.status === 'success' ? 'completed' : 'failed'}">${b.status}</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        UI.showToast('Failed to load backups', 'error');
+    }
+}
+
+async function handleTriggerBackup() {
+    if (!confirm('Run a backup now?')) return;
+    try {
+        UI.showLoading();
+        const result = await API.triggerBackup();
+        UI.hideLoading();
+        UI.showToast(`Backup ${result.status}: ${result.filename}`, result.status === 'success' ? 'success' : 'error');
+        await loadBackups();
+    } catch (error) {
+        UI.hideLoading();
+        UI.showToast('Backup failed: ' + error.message, 'error');
+    }
+}
+
 // ========== Event Listeners ==========
 document.addEventListener('DOMContentLoaded', () => {
     // Check if already logged in
@@ -776,18 +990,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.admin-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabName = tab.dataset.tab;
-            
+
             document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
-            
+
             tab.classList.add('active');
             document.getElementById(`${tabName}Tab`).classList.add('active');
+
+            if (tabName === 'review') loadReviewQueue();
+            if (tabName === 'backups') loadBackups();
         });
     });
 
     // Permission buttons
     document.getElementById('grantAccessBtn')?.addEventListener('click', handleGrantAccess);
     document.getElementById('revokeAccessBtn')?.addEventListener('click', handleRevokeAccess);
+
+    // Backup button
+    document.getElementById('triggerBackupBtn')?.addEventListener('click', handleTriggerBackup);
 
     // Auto-refresh documents every 5 seconds
     setInterval(() => {
@@ -801,3 +1021,6 @@ document.addEventListener('DOMContentLoaded', () => {
 window.viewDocument = viewDocument;
 window.filterByCollection = filterByCollection;
 window.handleCellUpdate = handleCellUpdate;
+window.openReviewDocument = openReviewDocument;
+window.loadReviewQueue = loadReviewQueue;
+window.closeReviewPanel = closeReviewPanel;

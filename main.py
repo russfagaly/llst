@@ -4,9 +4,11 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import os
+import re
 import shutil
+from datetime import date
 from pathlib import Path
 
 from backend.database import engine, get_db, Base
@@ -46,8 +48,77 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Serve uploaded images (needed for review panel image preview)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
 # Initialize OCR processor
 ocr_processor = OCRProcessor()
+
+# ========== FILENAME PARSER ==========
+
+_FILENAME_RE = re.compile(
+    r"^(.+?)\s*-\s*(\d{4}\s+\d{2}\s+\d{2})\s*-\s*(.+?)\s*-\s*(\d+)\.\w+$"
+)
+
+def parse_filename(filename: str) -> Optional[dict]:
+    """
+    Parse structured filenames like: Hitting - 2025 03 08 - Brewers - 1.png
+    Returns dict with data_type, game_date, team_name, file_number, or None on no match.
+    """
+    m = _FILENAME_RE.match(filename)
+    if not m:
+        return None
+    data_type, date_str, team_name, file_number = m.groups()
+    try:
+        year, month, day = date_str.split()
+        game_date = date(int(year), int(month), int(day))
+    except Exception:
+        return None
+    return {
+        "data_type": data_type.strip(),
+        "game_date": game_date,
+        "team_name": team_name.strip(),
+        "file_number": int(file_number),
+    }
+
+# ========== SCHEDULER ==========
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+
+    _scheduler = BackgroundScheduler()
+
+    def _scheduled_backup():
+        db = next(get_db())
+        try:
+            from backend.backup import run_backup
+            result = run_backup(db)
+            print(f"[scheduler] Backup completed: {result}")
+        except Exception as e:
+            print(f"[scheduler] Backup error: {e}")
+        finally:
+            db.close()
+
+    _BACKUP_SCHEDULE = os.getenv("BACKUP_SCHEDULE", "0 2 * * *")
+    try:
+        minute, hour, day, month, day_of_week = _BACKUP_SCHEDULE.split()
+        _scheduler.add_job(
+            _scheduled_backup,
+            CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=day_of_week),
+            id="daily_backup",
+            replace_existing=True
+        )
+    except Exception as e:
+        print(f"[scheduler] Invalid BACKUP_SCHEDULE, using default 2 AM: {e}")
+        _scheduler.add_job(_scheduled_backup, CronTrigger(hour=2, minute=0),
+                           id="daily_backup", replace_existing=True)
+
+    _scheduler.start()
+    print("[scheduler] APScheduler started — daily backup scheduled")
+
+except ImportError:
+    print("[scheduler] apscheduler not installed — scheduled backups disabled")
 
 # Background task for processing OCR
 def process_document_ocr(document_id: int, file_path: str):
@@ -69,8 +140,8 @@ def process_document_ocr(document_id: int, file_path: str):
             for cell_data in table_data["cells"]:
                 crud.create_cell(db, cell_data, db_table.id)
 
-        # Update status to completed
-        crud.update_document_status(db, document_id, 2)
+        # Update status to pending_review (4) — awaiting admin approval
+        crud.update_document_status(db, document_id, 4)
 
     except Exception as e:
         print(f"Error processing document {document_id}: {e}")
@@ -302,8 +373,18 @@ async def upload_document(
     with file_path.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Parse filename metadata
+    parsed = parse_filename(file.filename) or {}
+
     # Create document record
-    document = crud.create_document(db, file.filename, str(file_path), current_user.id, collection_id)
+    document = crud.create_document(
+        db, file.filename, str(file_path), current_user.id, collection_id,
+        data_type=parsed.get("data_type"),
+        game_date=parsed.get("game_date"),
+        team_name=parsed.get("team_name"),
+        file_number=parsed.get("file_number"),
+        filename_parsed=bool(parsed)
+    )
 
     # Schedule OCR processing in background
     background_tasks.add_task(process_document_ocr, document.id, str(file_path))
@@ -453,6 +534,71 @@ async def get_cell(
         raise HTTPException(status_code=403, detail="Access denied")
 
     return cell
+
+# ========== ADMIN BACKUP ENDPOINTS ==========
+
+@app.post("/api/admin/backup", response_model=schemas.BackupResponse)
+async def trigger_backup(
+    current_user: models.User = Depends(get_current_superuser),
+    db: Session = Depends(get_db)
+):
+    """Trigger a manual database backup (superuser only)"""
+    from backend.backup import run_backup
+    result = run_backup(db)
+    # Fetch and return the saved record
+    backups = crud.list_backups(db, limit=1)
+    if not backups:
+        raise HTTPException(status_code=500, detail="Backup record not found after run")
+    return backups[0]
+
+@app.get("/api/admin/backups", response_model=List[schemas.BackupResponse])
+async def list_backups(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: models.User = Depends(get_current_superuser),
+    db: Session = Depends(get_db)
+):
+    """List backup history (superuser only)"""
+    return crud.list_backups(db, skip=skip, limit=limit)
+
+# ========== ADMIN REVIEW ENDPOINTS ==========
+
+@app.get("/api/admin/review", response_model=List[schemas.DocumentWithTablesResponse])
+async def list_pending_review(
+    current_user: models.User = Depends(get_current_superuser),
+    db: Session = Depends(get_db)
+):
+    """List all documents awaiting review (status=4) with tables and cells (superuser only)"""
+    return crud.get_documents_pending_review(db)
+
+@app.get("/api/admin/review/{doc_id}", response_model=schemas.DocumentWithTablesResponse)
+async def get_review_document(
+    doc_id: int,
+    current_user: models.User = Depends(get_current_superuser),
+    db: Session = Depends(get_db)
+):
+    """Get a single pending-review document with image path, tables, and cells (superuser only)"""
+    document = crud.get_document(db, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.processed != 4:
+        raise HTTPException(status_code=400, detail="Document is not pending review")
+    return document
+
+@app.post("/api/admin/review/{doc_id}/approve")
+async def approve_document(
+    doc_id: int,
+    current_user: models.User = Depends(get_current_superuser),
+    db: Session = Depends(get_db)
+):
+    """Approve a pending-review document — sets status to completed (2) (superuser only)"""
+    document = crud.get_document(db, doc_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.processed != 4:
+        raise HTTPException(status_code=400, detail="Document is not pending review")
+    crud.approve_document(db, doc_id)
+    return {"message": "Document approved and committed"}
 
 # ========== INITIALIZATION ENDPOINT ==========
 

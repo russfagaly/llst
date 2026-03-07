@@ -121,6 +121,8 @@
                     <button class="admin-tab active" data-tab="users">Users</button>
                     <button class="admin-tab" data-tab="collections">Collections</button>
                     <button class="admin-tab" data-tab="permissions">Permissions</button>
+                    <button class="admin-tab" data-tab="review" id="reviewTab">Review Queue</button>
+                    <button class="admin-tab" data-tab="backups">Backups</button>
                 </div>
 
                 <!-- Users Tab -->
@@ -166,6 +168,52 @@
                         </div>
                     </div>
                     <div id="permissionsTable" class="data-table"></div>
+                </div>
+
+                <!-- Review Queue Tab -->
+                <div id="reviewTab" class="admin-tab-content">
+                    <div class="view-header">
+                        <h3>OCR Review Queue</h3>
+                        <button class="btn btn-secondary" onclick="loadReviewQueue()">Refresh</button>
+                    </div>
+                    <div id="reviewQueueList"></div>
+
+                    <!-- Review Detail Panel -->
+                    <div id="reviewDetailPanel" style="display:none;">
+                        <hr style="margin: 1.5rem 0;">
+                        <div class="view-header">
+                            <h3 id="reviewDocTitle">Review Document</h3>
+                            <div class="button-group">
+                                <button class="btn btn-success" id="approveDocBtn">Approve &amp; Commit</button>
+                                <button class="btn btn-danger" id="deleteReviewDocBtn">Delete Document</button>
+                                <button class="btn btn-secondary" onclick="closeReviewPanel()">Close</button>
+                            </div>
+                        </div>
+
+                        <!-- Parsed Metadata -->
+                        <div id="reviewDocMeta" class="document-info" style="margin-bottom:1rem;"></div>
+
+                        <!-- Side-by-side: image + tables -->
+                        <div class="review-panel">
+                            <div class="review-image-pane">
+                                <h4>Original Image</h4>
+                                <img id="reviewDocImage" src="" alt="Original image" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+                            </div>
+                            <div class="review-tables-pane">
+                                <h4>Extracted Tables <small style="color:#666;">(click cells to edit)</small></h4>
+                                <div id="reviewTablesContainer"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backups Tab -->
+                <div id="backupsTab" class="admin-tab-content">
+                    <div class="view-header">
+                        <h3>Database Backups</h3>
+                        <button class="btn btn-primary" id="triggerBackupBtn">Run Backup Now</button>
+                    </div>
+                    <div id="backupsTable" class="data-table"></div>
                 </div>
             </div>
         </div>

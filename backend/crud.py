@@ -139,13 +139,20 @@ def revoke_collection_access(db: Session, user_id: int, collection_id: int) -> b
     return False
 
 # Document CRUD operations
-def create_document(db: Session, filename: str, file_path: str, uploaded_by_id: int, collection_id: int) -> models.Document:
+def create_document(db: Session, filename: str, file_path: str, uploaded_by_id: int, collection_id: int,
+                    data_type: str = None, game_date=None, team_name: str = None,
+                    file_number: int = None, filename_parsed: bool = False) -> models.Document:
     """Create a new document record"""
     db_document = models.Document(
         filename=filename,
         file_path=file_path,
         uploaded_by_id=uploaded_by_id,
-        collection_id=collection_id
+        collection_id=collection_id,
+        data_type=data_type,
+        game_date=game_date,
+        team_name=team_name,
+        file_number=file_number,
+        filename_parsed=filename_parsed
     )
     db.add(db_document)
     db.commit()
@@ -160,23 +167,32 @@ def get_documents(db: Session, skip: int = 0, limit: int = 100) -> List[models.D
     """Get all documents"""
     return db.query(models.Document).offset(skip).limit(limit).all()
 
-def get_documents_by_collection(db: Session, collection_id: int, skip: int = 0, limit: int = 100) -> List[models.Document]:
+def get_documents_by_collection(db: Session, collection_id: int, skip: int = 0, limit: int = 100,
+                                 include_pending_review: bool = False) -> List[models.Document]:
     """Get all documents in a collection"""
-    return db.query(models.Document).filter(
-        models.Document.collection_id == collection_id
-    ).offset(skip).limit(limit).all()
+    q = db.query(models.Document).filter(models.Document.collection_id == collection_id)
+    if not include_pending_review:
+        q = q.filter(models.Document.processed != 4)
+    return q.offset(skip).limit(limit).all()
 
 def get_user_accessible_documents(db: Session, user: models.User, skip: int = 0, limit: int = 100) -> List[models.Document]:
-    """Get all documents the user has access to"""
+    """Get all documents the user has access to. Superusers see all; regular users skip pending_review."""
     if user.is_superuser:
         return get_documents(db, skip, limit)
 
-    # Get collection IDs user has access to
     collection_ids = [c.id for c in user.allowed_collections]
-
     return db.query(models.Document).filter(
-        models.Document.collection_id.in_(collection_ids)
+        models.Document.collection_id.in_(collection_ids),
+        models.Document.processed != 4
     ).offset(skip).limit(limit).all()
+
+def get_documents_pending_review(db: Session) -> List[models.Document]:
+    """Get all documents awaiting admin review (status=4)"""
+    return db.query(models.Document).filter(models.Document.processed == 4).all()
+
+def approve_document(db: Session, document_id: int) -> Optional[models.Document]:
+    """Set document status to completed (2), making it visible to regular users"""
+    return update_document_status(db, document_id, 2)
 
 def update_document_status(db: Session, document_id: int, status: int) -> Optional[models.Document]:
     """Update document processing status"""
@@ -268,3 +284,26 @@ def delete_cell(db: Session, cell_id: int) -> bool:
         db.commit()
         return True
     return False
+
+# Backup CRUD operations
+def create_backup_record(db: Session, filename: str, local_path: str = None, s3_key: str = None,
+                         s3_bucket: str = None, size_bytes: int = None, status: str = "success",
+                         error_message: str = None) -> models.Backup:
+    """Create a backup history record"""
+    db_backup = models.Backup(
+        filename=filename,
+        local_path=local_path,
+        s3_key=s3_key,
+        s3_bucket=s3_bucket,
+        size_bytes=size_bytes,
+        status=status,
+        error_message=error_message
+    )
+    db.add(db_backup)
+    db.commit()
+    db.refresh(db_backup)
+    return db_backup
+
+def list_backups(db: Session, skip: int = 0, limit: int = 50) -> List[models.Backup]:
+    """List backup history, most recent first"""
+    return db.query(models.Backup).order_by(models.Backup.created_at.desc()).offset(skip).limit(limit).all()

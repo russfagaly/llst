@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 
 # User schemas
@@ -79,6 +79,11 @@ class DocumentResponse(DocumentBase):
     processed: int
     uploaded_by_id: int
     collection_id: int
+    data_type: Optional[str] = None
+    game_date: Optional[date] = None
+    team_name: Optional[str] = None
+    file_number: Optional[int] = None
+    filename_parsed: bool = False
 
     class Config:
         from_attributes = True
@@ -130,6 +135,21 @@ class ExtractedTableResponse(ExtractedTableBase):
 
 class DocumentWithTablesResponse(DocumentDetailResponse):
     tables: List[ExtractedTableResponse] = []
+
+    class Config:
+        from_attributes = True
+
+# Backup schemas
+class BackupResponse(BaseModel):
+    id: int
+    filename: str
+    created_at: datetime
+    local_path: Optional[str] = None
+    s3_key: Optional[str] = None
+    s3_bucket: Optional[str] = None
+    size_bytes: Optional[int] = None
+    status: str
+    error_message: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean, Table
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean, Table, Date
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from backend.database import Base
@@ -53,9 +53,16 @@ class Document(Base):
     filename = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     upload_date = Column(DateTime, default=datetime.utcnow)
-    processed = Column(Integer, default=0)  # 0=pending, 1=processing, 2=completed, 3=failed
+    processed = Column(Integer, default=0)  # 0=pending, 1=processing, 2=completed, 3=failed, 4=pending_review
     uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     collection_id = Column(Integer, ForeignKey("collections.id"), nullable=False)
+
+    # Filename metadata (parsed from structured filenames)
+    data_type = Column(String(100))       # e.g. "Hitting", "Pitching"
+    game_date = Column(Date)              # parsed from filename
+    team_name = Column(String(100))       # e.g. "Brewers"
+    file_number = Column(Integer)         # sequence number from filename
+    filename_parsed = Column(Boolean, default=False)
 
     # Relationships
     tables = relationship("ExtractedTable", back_populates="document", cascade="all, delete-orphan")
@@ -91,3 +98,17 @@ class TableCell(Base):
 
     # Relationships
     table = relationship("ExtractedTable", back_populates="cells")
+
+class Backup(Base):
+    """Tracks database backup history"""
+    __tablename__ = "backups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    local_path = Column(String(512))
+    s3_key = Column(String(512))
+    s3_bucket = Column(String(255))
+    size_bytes = Column(Integer)
+    status = Column(String(20), nullable=False)  # "success" or "failed"
+    error_message = Column(Text)
