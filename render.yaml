@@ -4,7 +4,7 @@ services:
     env: python
     region: oregon
     plan: free
-    branch: claude/start-coding-session-011CUa6oAJHqW6rTpQZJ2AxV
+    branch: master
     buildCommand: chmod +x render-build.sh && ./render-build.sh
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
