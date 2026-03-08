@@ -5,7 +5,12 @@ set -e  # Exit on error
 
 echo "Installing system dependencies..."
 apt-get update
-apt-get install -y tesseract-ocr libtesseract-dev
+apt-get install -y \
+    tesseract-ocr \
+    libtesseract-dev \
+    postgresql-client \
+    libgl1 \
+    libglib2.0-0
 
 echo "Installing Python dependencies..."
 pip install --upgrade pip
