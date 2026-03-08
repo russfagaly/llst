@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: baseball-stats-ocr
+    env: python
+    runtime: python-3.11.0
+    region: oregon
+    plan: free
+    branch: claude/start-coding-session-011CUa6oAJHqW6rTpQZJ2AxV
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: INIT_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: ./uploads

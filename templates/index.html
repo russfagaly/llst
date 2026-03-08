@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baseball Stats OCR</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Login/Register View -->
+    <div id="authView" class="auth-container">
+        <div class="auth-card">
+            <h1>⚾ Baseball Stats OCR</h1>
+            <p class="subtitle">Extract and manage baseball statistics from screenshots</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Login</button>
+                <button class="auth-tab" data-tab="register">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label>Username or Email</label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Login</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="regFullName" required>
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="regUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="regEmail" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="regPassword" required minlength="8">
+                    <small>At least 8 characters</small>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="appView" class="app-container" style="display: none;">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">⚾ Baseball Stats OCR</div>
+            <div class="nav-menu">
+                <button class="nav-item active" data-view="dashboard">Dashboard</button>
+                <button class="nav-item" data-view="collections" id="collectionsNav">Collections</button>
+                <button class="nav-item admin-only" data-view="admin" style="display: none;">Admin</button>
+            </div>
+            <div class="nav-user">
+                <span id="userName">User</span>
+                <button id="logoutBtn" class="btn btn-secondary btn-sm">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Dashboard View -->
+        <div id="dashboardView" class="view active">
+            <div class="container">
+                <div class="view-header">
+                    <h2>My Documents</h2>
+                    <button id="uploadDocBtn" class="btn btn-primary">
+                        <span>📤</span> Upload Screenshot
+                    </button>
+                </div>
+
+                <!-- Collections Filter -->
+                <div class="filters">
+                    <label>Filter by Collection:</label>
+                    <select id="collectionFilter" class="form-select">
+                        <option value="">All Collections</option>
+                    </select>
+                </div>
+
+                <!-- Documents Grid -->
+                <div id="documentsGrid" class="documents-grid">
+                    <p class="empty-state">No documents yet. Upload your first baseball stats screenshot!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Collections View -->
+        <div id="collectionsView" class="view">
+            <div class="container">
+                <div class="view-header">
+                    <h2>My Collections</h2>
+                    <button id="createCollectionBtn" class="btn btn-primary admin-only" style="display: none;">
+                        <span>➕</span> Create Collection
+                    </button>
+                </div>
+
+                <div id="collectionsGrid" class="collections-grid">
+                    <p class="empty-state">No collections available</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin View -->
+        <div id="adminView" class="view">
+            <div class="container">
+                <h2>Admin Panel</h2>
+
+                <div class="admin-tabs">
+                    <button class="admin-tab active" data-tab="users">Users</button>
+                    <button class="admin-tab" data-tab="collections">Collections</button>
+                    <button class="admin-tab" data-tab="permissions">Permissions</button>
+                    <button class="admin-tab" data-tab="review" id="reviewTab">Review Queue</button>
+                    <button class="admin-tab" data-tab="backups">Backups</button>
+                </div>
+
+                <!-- Users Tab -->
+                <div id="usersTab" class="admin-tab-content active">
+                    <div class="view-header">
+                        <h3>Manage Users</h3>
+                    </div>
+                    <div id="usersTable" class="data-table"></div>
+                </div>
+
+                <!-- Collections Tab -->
+                <div id="adminCollectionsTab" class="admin-tab-content">
+                    <div class="view-header">
+                        <h3>Manage Collections</h3>
+                        <button id="adminCreateCollectionBtn" class="btn btn-primary">
+                            <span>➕</span> Create Collection
+                        </button>
+                    </div>
+                    <div id="adminCollectionsTable" class="data-table"></div>
+                </div>
+
+                <!-- Permissions Tab -->
+                <div id="permissionsTab" class="admin-tab-content">
+                    <div class="view-header">
+                        <h3>Manage Permissions</h3>
+                    </div>
+                    <div class="permissions-manager">
+                        <div class="form-group">
+                            <label>Select User</label>
+                            <select id="permUserSelect" class="form-select">
+                                <option value="">Choose a user...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Select Collection</label>
+                            <select id="permCollectionSelect" class="form-select">
+                                <option value="">Choose a collection...</option>
+                            </select>
+                        </div>
+                        <div class="button-group">
+                            <button id="grantAccessBtn" class="btn btn-success">Grant Access</button>
+                            <button id="revokeAccessBtn" class="btn btn-danger">Revoke Access</button>
+                        </div>
+                    </div>
+                    <div id="permissionsTable" class="data-table"></div>
+                </div>
+
+                <!-- Review Queue Tab -->
+                <div id="reviewTab" class="admin-tab-content">
+                    <div class="view-header">
+                        <h3>OCR Review Queue</h3>
+                        <button class="btn btn-secondary" onclick="loadReviewQueue()">Refresh</button>
+                    </div>
+                    <div id="reviewQueueList"></div>
+
+                    <!-- Review Detail Panel -->
+                    <div id="reviewDetailPanel" style="display:none;">
+                        <hr style="margin: 1.5rem 0;">
+                        <div class="view-header">
+                            <h3 id="reviewDocTitle">Review Document</h3>
+                            <div class="button-group">
+                                <button class="btn btn-success" id="approveDocBtn">Approve &amp; Commit</button>
+                                <button class="btn btn-danger" id="deleteReviewDocBtn">Delete Document</button>
+                                <button class="btn btn-secondary" onclick="closeReviewPanel()">Close</button>
+                            </div>
+                        </div>
+
+                        <!-- Parsed Metadata -->
+                        <div id="reviewDocMeta" class="document-info" style="margin-bottom:1rem;"></div>
+
+                        <!-- Side-by-side: image + tables -->
+                        <div class="review-panel">
+                            <div class="review-image-pane">
+                                <h4>Original Image</h4>
+                                <img id="reviewDocImage" src="" alt="Original image" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+                            </div>
+                            <div class="review-tables-pane">
+                                <h4>Extracted Tables <small style="color:#666;">(click cells to edit)</small></h4>
+                                <div id="reviewTablesContainer"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backups Tab -->
+                <div id="backupsTab" class="admin-tab-content">
+                    <div class="view-header">
+                        <h3>Database Backups</h3>
+                        <button class="btn btn-primary" id="triggerBackupBtn">Run Backup Now</button>
+                    </div>
+                    <div id="backupsTable" class="data-table"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Detail View -->
+        <div id="documentDetailView" class="view">
+            <div class="container">
+                <div class="view-header">
+                    <button id="backToDashboard" class="btn btn-secondary">← Back</button>
+                    <h2 id="documentTitle">Document</h2>
+                    <button id="deleteDocumentBtn" class="btn btn-danger">Delete</button>
+                </div>
+
+                <div id="documentInfo" class="document-info"></div>
+                <div id="tablesContainer" class="tables-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Baseball Stats Screenshot</h3>
+                <button class="modal-close" data-modal="uploadModal">×</button>
+            </div>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label>Select Collection</label>
+                    <select id="uploadCollectionSelect" class="form-select" required>
+                        <option value="">Choose a collection...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select Image</label>
+                    <div class="file-upload" id="fileUploadArea">
+                        <input type="file" id="fileInput" accept="image/*" required hidden>
+                        <div class="upload-placeholder">
+                            <span class="upload-icon">📷</span>
+                            <p>Click to select or drag and drop</p>
+                            <small>PNG, JPG, JPEG, BMP, TIFF</small>
+                        </div>
+                        <div class="upload-preview" style="display: none;">
+                            <img id="previewImage" src="" alt="Preview">
+                            <button type="button" class="btn btn-sm btn-secondary" id="changeFileBtn">Change File</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-modal="uploadModal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload & Process</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Collection Modal -->
+    <div id="createCollectionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Collection</h3>
+                <button class="modal-close" data-modal="createCollectionModal">×</button>
+            </div>
+            <form id="createCollectionForm">
+                <div class="form-group">
+                    <label>Collection Name</label>
+                    <input type="text" id="collectionName" class="form-input" required
+                           placeholder="e.g., 2024 Season Stats">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="collectionDescription" class="form-input" rows="3"
+                              placeholder="Optional description"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-modal="createCollectionModal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Collection</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
