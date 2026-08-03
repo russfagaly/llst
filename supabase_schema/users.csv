@@ -1,0 +1,10 @@
+column_name,type,default_value,primary_key
+id,int4,,yes
+email,varchar(255),,no
+username,varchar(100),,no
+hashed_password,varchar(255),,no
+full_name,varchar(255),,no
+is_active,boolean,true,no
+is_superuser,boolean,false,no
+created_date,timestamp,now(),no
+last_login,timestamp,,no

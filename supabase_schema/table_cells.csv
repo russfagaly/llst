@@ -1,0 +1,7 @@
+column_name,type,default_value,primary_key
+id,int4,,yes
+table_id,int4,,no
+row_index,int2,,no
+column_index,int2,,no
+content,text,,no
+confidence,float4,,no

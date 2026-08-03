@@ -1,0 +1,8 @@
+column_name,type,default_value,primary_key
+id,int4,,yes
+document_id,int4,,no
+table_number,int2,,no
+rows,int2,,no
+columns,int2,,no
+extraction_date,timestamp,now(),no
+confidence,float4,,no

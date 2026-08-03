@@ -1,0 +1,10 @@
+column_name,type,default_value,primary_key
+id,int4,,yes
+filename,varchar(255),,no
+created_at,timestamp,now(),no
+local_path,varchar(512),,no
+s3_key,varchar(512),,no
+s3_bucket,varchar(255),,no
+size_bytes,int8,,no
+status,varchar(20),,no
+error_message,text,,no

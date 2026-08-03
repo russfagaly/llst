@@ -1,0 +1,4 @@
+column_name,type,default_value,primary_key
+user_id,int4,,yes
+collection_id,int4,,yes
+granted_date,timestamp,now(),no

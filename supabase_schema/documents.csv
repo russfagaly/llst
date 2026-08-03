@@ -1,0 +1,13 @@
+column_name,type,default_value,primary_key
+id,int4,,yes
+filename,varchar(255),,no
+file_path,varchar(512),,no
+upload_date,timestamp,now(),no
+processed,int2,0,no
+uploaded_by_id,int4,,no
+collection_id,int4,,no
+data_type,varchar(100),,no
+game_date,date,,no
+team_name,varchar(100),,no
+file_number,int2,,no
+filename_parsed,boolean,false,no

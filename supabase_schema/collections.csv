@@ -1,0 +1,6 @@
+column_name,type,default_value,primary_key
+id,int4,,yes
+name,varchar(255),,no
+description,text,,no
+created_by_id,int4,,no
+created_date,timestamp,now(),no
